@@ -54,8 +54,8 @@ To run the app locally:
    ```bash
    pip install pandas
    ```
-Run the program:
-   
+   Run the program:
+
    ```bash
    python main_oop.py
    ```
