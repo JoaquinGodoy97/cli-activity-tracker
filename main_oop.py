@@ -1,10 +1,25 @@
 from __future__ import annotations
+from rich.console import Console
+from rich import print
 import pandas as pd
 from typing import List
 import os
 import datetime
 import calendar
 import time
+import sys
+
+console = Console()
+
+class Spinner:
+    def __init__(self):
+        self.console = console
+        self.spinner = "bouncingBall"
+        self.spinner_style = "white"
+
+    def start(self):
+        with self.console.status(f"\n[{self.spinner_style}]", spinner=self.spinner, spinner_style=self.spinner_style):
+            time.sleep(2)
 
 class Style:
     RED = '\033[91m'
@@ -20,6 +35,7 @@ class QuestionUtility:
     def ask_yes_no(question):
         answer = input(f"{question} (y/n): ").lower().strip()
         return answer in ["y", "yes"]
+
 
 class ActivityManager:
     def __init__(self, sheets_id: str): 
@@ -41,7 +57,8 @@ class ActivityManager:
 
             completed = tracker.is_activity_completed(act) if not tracker.progress.empty else False
             status = "✅" if completed else "⏳"
-            print(f"{Style.RED if not completed else ""} {i+1}. {act["activity"]} (Urgent: {act["urgent"]}) {Style.END} {status}")
+            activity_highlight = f"[#ff6b6b]{act['activity']}[/#ff6b6b]" if not completed else f"[#4CAF50]{act['activity']}[/#4CAF50]"
+            console.print(f"{i+1}. {activity_highlight} (Urgent: [bold #3F51B5]{act['urgent']}[/bold #3F51B5]) {status}", highlight=False)
 
     def get_activity(self, index: int) -> Activity:
         return self.activities.iloc[index]
@@ -197,7 +214,7 @@ class ProgressTracker:
         print(f"\nTotal time dedicated: {hours_nu} of hours {minutes_nu_text} dedicated and {working_hours} working hours{minutes_work_text}.\n")
         
         while True:
-            go_back = input("Enter 'back' if you want to go back to main menu: ")
+            go_back = input("Enter 'back' if you want to go back to main menu: ").strip().lower()
             if go_back == "back":
                 return
     
@@ -308,8 +325,8 @@ class CLI:
         while True:
             print("\nAvailable activities:")
             self.manager.list_activities(self.tracker)
-            print(f"\n{len(self.manager.activities) + 1}. Update progress")
-            print(f"{len(self.manager.activities) + 2}. Show progress")
+            console.print(f"\n{len(self.manager.activities) + 1}. Update progress", highlight=False)
+            console.print(f"{len(self.manager.activities) + 2}. Show progress", highlight=False)
 
             try:
 
@@ -324,17 +341,19 @@ class CLI:
 
                 elif choice == updateProgress_choice:
                     self.tracker.delete_progress()
+                    Spinner().start()
                     continue
 
                 elif choice == show_progress_choice:
                     self.tracker.show_progress()
+                    Spinner().start()
                     continue
 
                 elif choice < 0 or choice >= len(self.manager.activities):
                     print("❌ Invalid choice. Try again.")
-                    time.sleep(2)
+                    Spinner().start()
                     continue
-
+                
                 raw_activity = self.manager.get_activity(choice)
                 activity = Activity(raw_activity)
 
@@ -343,7 +362,8 @@ class CLI:
                 continue 
                 
             self.handle_activity(activity, self.tracker)
-            time.sleep(2)
+            Spinner().start()
+
 
     def handle_activity(self, activity, tracker):
         if activity.is_urgent:
