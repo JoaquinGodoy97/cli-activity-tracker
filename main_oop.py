@@ -31,8 +31,15 @@ class ActivityManager:
     
     def list_activities(self, tracker: ProgressTracker): 
 
+        if self.activities.empty:
+            print("📭 No activities found.")
+            return
+        
+        # print("📭 No progress found so far.")
+
         for i, act in self.activities.iterrows():
-            completed = tracker.is_activity_completed(act)
+
+            completed = tracker.is_activity_completed(act) if not tracker.progress.empty else False
             status = "✅" if completed else "⏳"
             print(f"{Style.RED if not completed else ""} {i+1}. {act["activity"]} (Urgent: {act["urgent"]}) {Style.END} {status}")
 
@@ -200,9 +207,9 @@ class ProgressTracker:
         month_name = datetime.datetime.now().strftime('%B')
 
         weekly_counts = self.filter_weeks_by_activity(activity)
-        week_by_month_number = len(weekly_counts.index.tolist())
+        week_by_month_number = len(weekly_counts.index.tolist()) if not weekly_counts.empty else 0
 
-        if not week_by_month_number:
+        if not week_by_month_number or week_by_month_number == 0:
             print(f"Week 1 of {month_name}: ❌ Only 0/{int(activity.quota)}\n")
 
         for week, count in weekly_counts.items():
@@ -216,6 +223,9 @@ class ProgressTracker:
         # target_month = 8 # just testing other month
 
         target_month = datetime.datetime.now().month
+
+        if self.progress.empty:
+            return pd.Series(dtype=int)
 
         monthly_data = self.progress[
             self.progress["date"].dt.month == target_month
@@ -267,9 +277,13 @@ class Activity:
         self.trigger_question = data["trigger_question"]
     
     def is_repeated(self, tracker: ProgressTracker): 
+
+        if tracker.progress.empty:
+            return False
+        
         try:
-            todayActivities = tracker[
-                tracker["date"].dt.day == datetime.datetime.now().day
+            todayActivities = tracker.progress[
+                tracker.progress["date"].dt.day == datetime.datetime.now().day
             ]
         
             isActivityRepeated = self.name in todayActivities["tasks_finished"].to_list()
@@ -303,6 +317,7 @@ class CLI:
                 show_progress_choice = len(self.manager.activities) + 1
 
                 choice = int(input("\nChoose an activity number (or 0 to exit): ")) - 1
+
                 if choice == -1:
                     print("👋 Exiting. See you next time.")
                     break
@@ -313,6 +328,11 @@ class CLI:
 
                 elif choice == show_progress_choice:
                     self.tracker.show_progress()
+                    continue
+
+                elif choice < 0 or choice >= len(self.manager.activities):
+                    print("❌ Invalid choice. Try again.")
+                    time.sleep(2)
                     continue
 
                 raw_activity = self.manager.get_activity(choice)
@@ -329,14 +349,12 @@ class CLI:
         if activity.is_urgent:
             print(f"⚡ Urgent task: {activity.name}")
 
-            if activity.is_repeated(tracker.progress):
+            if activity.is_repeated(tracker):
                 print("You've done this activity already.")
 
-          
+            elif not activity.is_repeated(tracker):
 
-            elif not activity.is_repeated(tracker.progress):
-
-                hours_worked = int(input("How many hours did you work?"))
+                hours_worked = int(input("How many hours did you work? (Enter a number): "))
                 activity.time = hours_worked * 60
 
                 if QuestionUtility.ask_yes_no("Did you finish it?"):
@@ -354,7 +372,7 @@ class CLI:
             # Weekly progress
             tracker.check_weekly_progress(activity)
 
-            if activity.is_repeated(tracker.progress):
+            if activity.is_repeated(tracker):
                 print("You've done this activity already.")
             
             elif QuestionUtility.ask_yes_no(activity.trigger_question):
