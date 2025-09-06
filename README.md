@@ -53,11 +53,12 @@ To run the app locally:
 3. Install dependencies:  
    ```bash
    pip install pandas
-
+   ```
 Run the program:
-```bash
-python main_oop.py
-```
+   
+   ```bash
+   python main_oop.py
+   ```
 On startup, provide your Google Sheets ID (with the activities list).
 
 --------------------------------------------
