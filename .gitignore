@@ -1,7 +1,12 @@
-activities.csv
-fake_progress.csv
-progress1.csv
-main.py
+main_oop.py
 progress.csv
-progress
+/data/progress_test
 .venv
+__pycache__
+test_time_utils.py
+new_features_testing/
+
+
+vosk-model-small-en-us-0.15
+requirements.txt
+data/

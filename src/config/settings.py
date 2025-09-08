@@ -1,0 +1,1 @@
+PROGRESS_FILE = "data/progress.csv"
