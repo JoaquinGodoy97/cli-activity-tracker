@@ -6,6 +6,7 @@ from ..core.activity import Activity
 from ..utils.time_utils import TimeUtility
 from ..utils.question_utils import QuestionUtility
 from ..utils.spinner import Spinner
+from datetime import datetime, timedelta
 
 console = Console()
 
@@ -19,10 +20,12 @@ class MenuHandler:
 
     def run(self) -> None:
         """Main menu loop."""
+
         self.manager = ActivityManager(self.sheets_id)
-        hours_left, mins_left = TimeUtility.hours_remaining_in_day()
 
         while True:
+            hours_left, mins_left = TimeUtility.hours_remaining_in_day()
+
             self._display_main_menu(hours_left, mins_left)
             choice = self._get_user_choice()
             
@@ -33,6 +36,12 @@ class MenuHandler:
                 self._handle_update_progress()
             elif choice == len(self.manager.activities) + 1:  # Show progress
                 self._handle_show_progress()
+            elif choice == len(self.manager.activities) + 2:  # Extend day
+                self._handle_extend_day()
+            elif choice == len(self.manager.activities) + 3:
+                self._handle_refresh()
+            elif choice == len(self.manager.activities) + 4 and TimeUtility.time_warped_detection():  # Delete progress
+                self._handle_time_warp()
             elif 0 <= choice < len(self.manager.activities):  # Activity selection
                 self._handle_activity_selection(choice)
             else:
@@ -45,6 +54,11 @@ class MenuHandler:
         self.manager.list_activities(self.tracker)
         console.print(f"\n{len(self.manager.activities) + 1}. Update progress", highlight=False)
         console.print(f"{len(self.manager.activities) + 2}. Show progress", highlight=False)
+        console.print(f"{len(self.manager.activities) + 3}. Extend workday", highlight=False)
+        console.print(f"{len(self.manager.activities) + 4}. Refresh\n", highlight=False)
+        if TimeUtility.time_warped_detection():
+            console.print(f"{len(self.manager.activities) + 5}. Back to the present!", highlight=False)
+        
         console.print(f"\n⏳ You have approximately [bold #ff6b6b]{hours_left}[/bold #ff6b6b] hours and [bold #ff6b6b]{mins_left}[/bold #ff6b6b] mins. left today to work on your tasks.\n", highlight=False)
 
     def _get_user_choice(self) -> int:
@@ -63,6 +77,38 @@ class MenuHandler:
     def _handle_show_progress(self) -> None:
         """Handle show progress menu."""
         self.tracker.show_progress()
+        Spinner().start()
+
+    def _handle_extend_day(self) -> None:
+        """Handle extending the workday."""
+        """Extend the workday will give you a few more hours to work on your tasks."""
+
+        hours_to_extend = int(input("How many hours do you want to extend your workday? (Enter a number): "))
+        if hours_to_extend <= 0:
+            print("❌ Invalid number of hours. Must be greater than 0.")
+            Spinner().start()
+            return
+
+        try:
+            extended_now = datetime.now() - timedelta(hours=hours_to_extend)
+            TimeUtility.set_virtual_now(extended_now)
+            print(f"✅ Day extended by {hours_to_extend}h. Virtual time is now {extended_now.strftime('%H:%M')}")
+            self.tracker.refresh()
+            Spinner().start()
+        except ValueError:
+            print("❌ Invalid input. Please enter a number.")
+            Spinner().start()
+
+    def _handle_time_warp(self) -> None:
+        """Handle time warp."""
+        TimeUtility.reset_virtual_now()
+        print("✅ Time warp detected. Back to the present.")
+        self.tracker.refresh()
+        Spinner().start()
+
+    def _handle_refresh(self) -> None:
+        """Handle refresh progress."""
+        self.tracker.refresh()
         Spinner().start()
 
     def _handle_activity_selection(self, choice: int) -> None:

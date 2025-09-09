@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-import datetime
+from datetime import datetime, timedelta
 from src.config.settings import PROGRESS_FILE
 from typing import TYPE_CHECKING, Dict, Any
 import calendar
@@ -27,18 +27,24 @@ class ProgressTracker:
             console.print("📁 Created new progress.csv file.")
             return empty_df
 
-        return pd.read_csv(PROGRESS_FILE, parse_dates=["date"])
+        # Load and robustly coerce dates to datetimelike values
+        df = pd.read_csv(PROGRESS_FILE)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        return df
 
     def is_activity_completed(self, activity: object):
 
+        today_anchor = TimeUtility.get_now().date().day
+
         todayActivities = self.progress[
-                self.progress["date"].dt.day == datetime.datetime.now().day
+                self.progress["date"].dt.day == today_anchor
             ]
 
         return activity["activity"] in todayActivities.values
 
     def update_progress(self, filtered_progress: pd.DataFrame):
-        filtered_progress.to_csv("progress.csv", index=False)
+        filtered_progress.to_csv(PROGRESS_FILE, index=False)
 
     def refresh(self):
         self.progress = self.load_progress()
@@ -118,7 +124,15 @@ class ProgressTracker:
 
         print(f"\n🗑️ Entries to delete for {label}:")
         for idx, row in entries.iterrows():
-            print(f"{idx}. {row['tasks_finished']} ({row['date'].date()})")
+            date_val = row['date']
+            if pd.notna(date_val):
+                try:
+                    date_text = date_val.date() if hasattr(date_val, 'date') else str(date_val)
+                except Exception:
+                    date_text = str(date_val)
+            else:
+                date_text = "Unknown date"
+            print(f"{idx}. {row['tasks_finished']} ({date_text})")
 
         confirm = input("\nAre you sure you want to delete these entries? (yes/no): ").strip().lower()
         if confirm == "yes":
@@ -141,7 +155,15 @@ class ProgressTracker:
         total_time_not_urgent = 0
         work_time = 0
         for i, row in self.progress.iterrows():
-            date_str = row["date"].strftime("%Y-%m-%d")
+            date_val = row["date"]
+            if pd.notna(date_val):
+                try:
+                    date_str = date_val.strftime("%Y-%m-%d")
+                except Exception:
+                    # Fallback for non-datetime-like values
+                    date_str = str(date_val)
+            else:
+                date_str = "Unknown date"
 
             if row["tasks_finished"] == "work":
                 work_time += row['time_dedicated']
@@ -171,12 +193,12 @@ class ProgressTracker:
     # Checks quota over the months divided by weekly quota
     def check_weekly_progress(self, activity: 'Activity') -> None: # utility
 
-        month_name = datetime.datetime.now().strftime('%B')
+        month_name = TimeUtility.get_now().strftime('%B')
 
         weekly_counts = self.filter_weeks_by_activity(activity)
         week_by_month_number = len(weekly_counts.index.tolist()) if not weekly_counts.empty else 0
 
-        tu = TimeUtility(datetime.date.today())
+        tu = TimeUtility(TimeUtility.get_now())
         tu.get_weeks_of_month()
         all_weeks_by_month = tu.get_weeks_of_month_iso()
 
@@ -208,7 +230,7 @@ class ProgressTracker:
 
     # Returns a weekly dateframe filter by activity
     def filter_weeks_by_activity(self, activity: 'Activity') -> pd.Series:  
-        target_month = datetime.datetime.now().month
+        target_month = TimeUtility.get_now().month
 
         if self.progress.empty:
             return pd.Series(dtype=int)
@@ -229,7 +251,7 @@ class ProgressTracker:
 
     def add_activity(self, activity: 'Activity') -> None:
         """Add activity to progress tracking."""
-        today = datetime.date.today().isoformat()
+        today = TimeUtility.get_now().date().isoformat()
         progress_entry = {
                 "date": today,
                 "tasks_finished": activity.name,
